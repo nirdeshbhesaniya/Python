@@ -1,6 +1,5 @@
 import re
 import asyncio
-import html
 from markdownify import markdownify as md
 import google.generativeai as genai
 from config import GEMINI_API_KEY, TELEGRAM_BOT_TOKEN
@@ -22,33 +21,22 @@ LANGUAGES = ["python", "cpp", "java", "javascript", "c", "typescript", "html", "
 
 # Format Gemini response
 def format_gemini_response(raw_text: str, language: str = "python") -> str:
-    """
-    Format Gemini response into:
-    - Indexed bullet points with short, aligned sentences
-    - Bold topic titles if detected (e.g., "Definition:")
-    - Clean and readable code block in selected language
-    """
     pattern = r"```(?:\w+)?\n(.*?)```"
     parts = re.split(pattern, raw_text, flags=re.DOTALL)
     formatted = ""
 
     def clean_and_format_explanation(text: str) -> str:
-        # Convert to markdown and clean unwanted characters
         markdown_text = md(text.strip())
         markdown_text = re.sub(r'[^\w\s.,:;!?()\[\]\'"“”\-]', '', markdown_text)
-
-        # Break into clean, non-trivial sentences
         sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', markdown_text) if len(s.strip()) > 25]
-        sentences = sentences[:6]  # Limit to first 6 for brevity
-
+        sentences = sentences[:6]
         output = ""
         for idx, sentence in enumerate(sentences):
-            # Bold topic if in "Keyword: Explanation" form
             match = re.match(r"([\w\s]{2,20}?):\s*(.*)", sentence)
             if match:
                 topic = match.group(1).strip().capitalize()
                 detail = match.group(2).strip()
-                output += f"{idx+1}. **{topic}:** {detail}\n"
+                output += f"{idx+1}. *{topic}:* {detail}\n"
             else:
                 output += f"{idx+1}. {sentence}\n"
         return output.strip()
@@ -63,7 +51,7 @@ def format_gemini_response(raw_text: str, language: str = "python") -> str:
 
     return formatted.strip()
 
-# Generate Gemini response with language-specific prompt
+# Generate AI response
 def generate_response(prompt: str, language: str = "python") -> str:
     try:
         system_prompt = (
@@ -76,7 +64,7 @@ def generate_response(prompt: str, language: str = "python") -> str:
     except Exception as e:
         return f"```{language}\n# Error: {str(e)}\n```"
 
-# Start command
+# /start command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "👋 *Welcome to Code Generator Bot!*\n\n"
@@ -86,18 +74,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-# Handle prompt message
+# Handle user messages
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     prompt = update.message.text
     user_prompts[user_id] = prompt
 
-    # Clear user prompt after 5 minutes
     async def clear_prompt():
         await asyncio.sleep(300)
         user_prompts.pop(user_id, None)
 
-    asyncio.create_task(clear_prompt())
+    context.application.create_task(clear_prompt())
 
     keyboard = [
         [InlineKeyboardButton(lang.title(), callback_data=f"{lang}|{user_id}")]
@@ -106,7 +93,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("🧠 Choose a language to generate code:", reply_markup=markup)
 
-# Handle language button click
+# Handle language button press
 async def handle_language_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -114,7 +101,7 @@ async def handle_language_choice(update: Update, context: ContextTypes.DEFAULT_T
     try:
         lang, user_id = query.data.split('|')
         user_id = int(user_id)
-    except:
+    except Exception:
         await query.edit_message_text("❌ Invalid selection.")
         return
 
@@ -132,19 +119,18 @@ async def handle_language_choice(update: Update, context: ContextTypes.DEFAULT_T
 
     try:
         sent = await query.message.reply_text(response_text, parse_mode="Markdown")
-    except:
+    except Exception:
         await query.message.reply_text("❌ Error formatting response. Try a simpler prompt.")
         return
 
-    # Auto-delete response and status after 2 minutes
     await asyncio.sleep(120)
     try:
         await context.bot.delete_message(chat_id=sent.chat_id, message_id=sent.message_id)
         await context.bot.delete_message(chat_id=waiting.chat_id, message_id=waiting.message_id)
-    except:
+    except Exception:
         pass
 
-# Main bot setup
+# Bot main loop
 def main():
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))

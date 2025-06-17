@@ -6,6 +6,8 @@ import musicLibrary
 import requests
 import pygame
 import os
+from dotenv import load_dotenv
+import os
 import google.generativeai as genai
 from threading import Thread
 from PIL import Image, ImageTk
@@ -13,8 +15,11 @@ import time
 import itertools
 
 # API Keys
-NEWS_API_KEY = "e35eff5fdd8848ed8280a242b412862a"
-GEMINI_API_KEY = "AIzaSyAtDyldSoilNiJZu0o475i3-Ri_zReGGdk"
+load_dotenv()
+NEWS_API = os.getenv("NEWS_API_KEY")
+genai_api_key = os.getenv("GEMINI_API_KEY")
+if not genai_api_key:
+    raise ValueError("GEMINI_API_KEY environment variable not set.")
 
 # Initialize recognizer and TTS engine
 recognizer = sr.Recognizer()
@@ -25,8 +30,9 @@ recognizer.dynamic_energy_threshold = True
 engine = pyttsx3.init()
 pygame.mixer.init()
 
+
 # Configure Gemini
-genai.configure(api_key=GEMINI_API_KEY)
+genai.configure(api_key=genai_api_key)
 gemini_model = genai.GenerativeModel("models/gemini-1.5-flash")
 
 # Setup UI
@@ -123,7 +129,7 @@ def process_command(cmd):
             speak(f"{song} not found in your music library.")
     elif "news" in cmd:
         try:
-            r = requests.get(f"https://newsapi.org/v2/top-headlines?country=in&apiKey={NEWS_API_KEY}")
+            r = requests.get(f"https://newsapi.org/v2/top-headlines?country=in&apiKey={NEWS_API}")
             if r.status_code == 200:
                 articles = r.json().get("articles", [])[:5]
                 for article in articles:
