@@ -60,4 +60,4 @@ Welcome to the **Python Mastery Course**! Whether you're a beginner or brushing 
 1. Clone the repo:
    ```bash
    git clone https://github.com/nirdeshbhesaniya/Python.git
-   cd python-complete-course
+   cd Python
